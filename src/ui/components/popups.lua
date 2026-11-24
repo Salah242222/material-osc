@@ -1201,11 +1201,15 @@ end
     return node
   end
 
+  -- evens out quiet dialogue and loud scenes; the label lets material-osc find
+  -- and toggle its own filter without touching filters from mpv.conf
+  local NORMALIZE_FILTER = "@mosc-normalize:dynaudnorm=f=75:g=25:p=0.55"
+
   local function AudioSettingsPopup(on_back)
     local node = {
-      width = dp(320), height = dp(156), interactive = false,
+      width = dp(320), height = dp(200), interactive = false,
       panel_alpha = "00", text_alpha = "00", secondary_alpha = "00",
-      hover_alpha = "00", delay = 0, device = "",
+      hover_alpha = "00", delay = 0, device = "", normalize = false,
       modifier = Modifier():clickable({
         name = "audio-settings-panel", enabled = false, on_click = function() end
       })
@@ -1221,12 +1225,15 @@ end
       on_click = function()
         mp.set_property_number("audio-delay", services.audio_defaults.delay)
         mp.set_property("audio-device", services.audio_defaults.device)
+        if node.normalize then mp.commandv("af", "remove", "@mosc-normalize") end
       end
     })
     node.delay_row = SubtitleAdjustRow("audio-settings-delay", "Delay",
       function() shift_delay(-0.05) end, function() shift_delay(0.05) end)
     node.device_row = SettingsActionRow("audio-settings-device", "speaker",
       function() set_settings_page("audio_devices") end)
+    node.normalize_row = SettingsActionRow("audio-settings-normalize", "graphic_eq",
+      function() mp.commandv("af", "toggle", NORMALIZE_FILTER) end)
     function node:update(props)
       update_fields(self, props)
       self.modifier.fixed_width, self.modifier.fixed_height = self.width, self.height
@@ -1239,6 +1246,8 @@ end
       self.delay_row:update(common)
       common.label, common.value = "Device", self.device
       self.device_row:update(common)
+      common.label, common.value = "Normalize volume", self.normalize and "On" or "Off"
+      self.normalize_row:update(common)
     end
     function node:measure(parent)
       return apply_modifier_size(self.modifier, {w = self.width, h = self.height}, parent)
@@ -1249,7 +1258,7 @@ end
       draw_node(self.header, ass, Rect({x = bounds.x, y = bounds.y,
         w = bounds.w, h = dp(56)}))
       local y = bounds.y + dp(60)
-      for _, row in ipairs({self.delay_row, self.device_row}) do
+      for _, row in ipairs({self.delay_row, self.device_row, self.normalize_row}) do
         draw_node(row, ass, Rect({x = bounds.x + dp(8), y = y,
           w = bounds.w - dp(16), h = dp(44)}))
         y = y + dp(44)
@@ -1506,6 +1515,7 @@ end
         self.video_shaders:update(page_props)
       elseif settings_state.page == "audio_settings" then
         page_props.delay, page_props.device = self.audio_delay, self.audio_device
+        page_props.normalize = self.audio_normalize
         for _, item in ipairs(self.audio_device_items or {}) do
           if item.id == self.audio_device then page_props.device = item.label end
         end
@@ -1695,7 +1705,7 @@ end
           settings_state.page == "video_aspect" then desired_h = dp(164)
         elseif settings_state.page == "video_shaders" and item_count == 0 then
           desired_h = dp(116)
-        elseif settings_state.page == "audio_settings" then desired_h = dp(156)
+        elseif settings_state.page == "audio_settings" then desired_h = dp(200)
         else
           local has_footer = settings_state.page == "subtitles" or
             settings_state.page == "secondary_subtitles" or
@@ -1776,6 +1786,7 @@ end
         props.audio_delay = snapshot.audio_delay or 0
         props.audio_device = snapshot.audio_device or "auto"
         props.audio_device_items = snapshot.audio_device_items or {}
+        props.audio_normalize = snapshot.audio_normalize == true
         popup:update(props)
       end
     })

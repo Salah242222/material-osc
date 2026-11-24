@@ -269,6 +269,14 @@ function snapshot.reader(deps)
       end
     end
 
+    local audio_normalize = false
+    for _, filter in ipairs(property_native("af", {}) or {}) do
+      if type(filter) == "table" and filter.label == "mosc-normalize" and
+        filter.enabled ~= false then
+        audio_normalize = true
+      end
+    end
+
     local audio_device_items = {}
     for _, device in ipairs(property_native("audio-device-list", {}) or {}) do
       if type(device) == "table" and device.name then
@@ -322,6 +330,7 @@ function snapshot.reader(deps)
       audio_delay = property_number("audio-delay", 0) or 0,
       audio_device = property("audio-device", "auto") or "auto",
       audio_device_items = audio_device_items,
+      audio_normalize = audio_normalize,
       chapter_name = chapter_name,
       time_text = displayed_time .. " / " .. format_time(displayed_duration),
       buffering = is_buffering(),
