@@ -36,6 +36,7 @@ material-osc can be customized with a `material-osc.conf` file in mpv's
 | `show_empty_screen` | `yes` | `yes`, `no` | Shows the material-osc welcome screen when the playlist is empty. Set to `no` to leave the empty player unobstructed. |
 | `screenshot_button` | `yes` | `yes`, `no` | Shows or hides the screenshot button in the playback controls. |
 | `pip_button` | `yes` | `yes`, `no` | Shows or hides the Picture-in-Picture button in the playback controls. |
+| `compact_controls` | `auto` | `auto`, `no` | In windows narrower than about 560 pixels, hides the screenshot, picture-in-picture, pin and info buttons (and opens the volume slider vertically) so the controls fit; below about 360 pixels the time, chapter name and settings button are hidden too (`Ctrl+,` still opens Settings unless it's bound to something else). The chapter name always shortens to the room that's left, and the time hides whenever it wouldn't fit. |
 | `volume_slider` | `vertical` | `vertical`, `horizontal` | Opens the volume slider above the volume button, or beside it to the right. |
 | `ontop_button` | `no` | `yes`, `no` | Shows a pin button in the playback controls that toggles always-on-top. It stays highlighted while pinned. |
 | `info_button` | `no` | `yes`, `no` | Shows an info button in the playback controls that runs `info_mbtn_left_command`. |

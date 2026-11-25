@@ -99,7 +99,8 @@ function controls.new(services)
   end
 
   local function horizontal_volume()
-    return config.opts.volume_slider == "horizontal"
+    -- compact rows have no room for the slider to slide out sideways
+    return config.opts.volume_slider == "horizontal" and not state.controller.compact
   end
 
   local function VolumeSlider()
@@ -874,13 +875,14 @@ function controls.new(services)
       primary = node.time,
       secondary = node.cached
     })
+    node.time_visibility = Visibility({visible = true, child = node.time_cache})
 
     local starting = {Pill({children = {node.play}})}
     if config.opts.prev_next_beside_play then
       starting[#starting + 1] = Pill({children = {node.previous, node.next}})
     end
     starting[#starting + 1] = Pill({no_background = true, children = {node.volume}})
-    starting[#starting + 1] = node.time_cache
+    starting[#starting + 1] = node.time_visibility
     starting[#starting + 1] = node.chapter
     node.starting = Row({
       gap = dp(8),
@@ -911,6 +913,7 @@ function controls.new(services)
       on_click = function()
         set_settings_dialog_open(not settings_state.open)
       end})
+    node.settings_visibility = Visibility({visible = true, child = node.settings})
     node.pip = IconButton({name = "picture-in-picture-button",
       icon = "picture_in_picture_alt", horizontal_padding = 6,
       tooltip = "Picture in Picture",
@@ -944,7 +947,7 @@ function controls.new(services)
       gap = 0,
       children = {
         node.subtitles_visibility, node.screenshot_visibility,
-        node.pip_visibility, node.settings, node.info_visibility,
+        node.pip_visibility, node.settings_visibility, node.info_visibility,
         node.ontop_visibility, node.fullscreen
       },
       modifier = Modifier()
@@ -961,10 +964,20 @@ function controls.new(services)
 
     function node:update(snapshot, static_changed)
       self.sponsorblock:update()
-      self.screenshot_visibility:set_visible(config.opts.screenshot_button)
-      self.pip_visibility:set_visible(config.opts.pip_button)
-      self.ontop_visibility:set_visible(config.opts.ontop_button)
-      self.info_visibility:set_visible(config.opts.info_button)
+      -- narrow windows keep play, volume, time, subtitles, settings and
+      -- fullscreen, so the two button groups don't run into each other; tiny
+      -- ones also drop the time, chapter and settings
+      local compact = config.opts.compact_controls == "auto" and
+        state.viewport.w < dp(560)
+      state.controller.compact = compact
+      self.tiny = compact and state.viewport.w < dp(360)
+      state.controller.tiny = self.tiny
+      self.settings_visibility:set_visible(not self.tiny)
+      self.screenshot_visibility:set_visible(config.opts.screenshot_button and not compact)
+      self.pip_visibility:set_visible(config.opts.pip_button and not compact)
+      self.ontop_visibility:set_visible(config.opts.ontop_button and not compact)
+      self.info_visibility:set_visible(config.opts.info_button and not compact)
+      self.chapter_name = snapshot.chapter_name
       if static_changed then
         self.play:update({
           icon = snapshot.paused and "play_arrow" or "pause",
@@ -1000,8 +1013,6 @@ function controls.new(services)
       self.cached:set_visible(cached ~= nil)
       self.cached_time:update({text = format_time(cached or 0)})
       if static_changed then
-        self.chapter_text:update({text = snapshot.chapter_name or ""})
-        self.chapter:set_visible(snapshot.chapter_name ~= nil)
         local subtitles_on = snapshot.subtitle_id ~= 0 and snapshot.sub_visibility
         self.subtitles_visibility:set_visible(#snapshot.subtitle_items > 1)
         self.subtitles:update({
@@ -1040,12 +1051,41 @@ function controls.new(services)
       }, parent)
     end
 
+    -- the time shows only while it fits beside the buttons on the right; the
+    -- chapter name gets the room left after it, shortened to fit, and hides
+    -- when only a few letters would
+    function node:fit_row(bounds)
+      self.chapter:set_visible(false)
+      self.time_visibility:set_visible(not self.tiny)
+      if not self.tiny and measure_node(self.starting, bounds).w + dp(16) +
+        measure_node(self.ending_actions, bounds).w > bounds.w then
+        self.time_visibility:set_visible(false)
+      end
+      if not self.time_visibility.visible then
+        -- the clock is redrawn every second at these bounds, so forget them
+        self.time.bounds, self.cached_time.bounds = nil, nil
+      end
+      if self.tiny then return end
+      local name = self.chapter_name
+      if not name then return end
+      self.chapter_text:update({text = ""})
+      local pill_chrome = measure_node(self.chapter_content, bounds).w
+      local room = bounds.w - measure_node(self.starting, bounds).w -
+        measure_node(self.ending_actions, bounds).w - dp(8) - dp(16) - pill_chrome
+      if room < dp(48) then return end
+      self.chapter_text:update({
+        text = ui.truncate_to_width(name, room, self.chapter_text.size)
+      })
+      self.chapter:set_visible(true)
+    end
+
     function node:draw(ass, bounds)
       if precise_seeking() then
         state.seek.precise.strip_bounds = bounds
         return
       end
       state.seek.precise.strip_bounds = nil
+      self:fit_row(bounds)
       draw_node(self.starting, ass, bounds)
       draw_node(self.ending_actions, ass, bounds)
     end

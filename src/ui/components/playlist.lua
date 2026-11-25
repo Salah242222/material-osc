@@ -443,9 +443,15 @@ function playlist.new(services, trailing)
     node.next = FooterButton("playlist-next", "skip_next", "Next", next_item,
       "playlist-next", true)
 
-    -- previous/next move beside play/pause with prev_next_beside_play
+    -- previous/next move beside play/pause with prev_next_beside_play; tiny
+    -- windows (compact_controls) leave out the playlist button while it's closed
     local function footer_buttons()
-      if services.config.opts.prev_next_beside_play then return {node.playlist} end
+      local tiny = state.controller.tiny and not playlist_state.open and
+        node.morph == 0
+      if services.config.opts.prev_next_beside_play then
+        return tiny and {} or {node.playlist}
+      end
+      if tiny then return {node.previous, node.next} end
       return {node.playlist, node.previous, node.next}
     end
 
@@ -574,13 +580,14 @@ function playlist.new(services, trailing)
       if not is_render_pass("base") then return end
       playlist_state.anchor_bounds = source
       if self.morph == 0 and not playlist_state.open and
-        not morphing then
+        not morphing and #footer_buttons() > 0 then
         draw_box(ass, source.x, source.y, source.x2, source.y2,
           source.h / 2, "#050708",
           alpha(self.controls_opacity * (1 - 0x58 / 255)))
         draw_control_buttons(ass, source, source, 0)
       end
-      local title = self.snapshot.media_title or ""
+      -- tiny windows have no room for the title
+      local title = not state.controller.tiny and self.snapshot.media_title or ""
       local title_x = bounds.x + source.w + dp(12)
       local trailing_gap = trailing_size.w > 0 and dp(12) or dp(8)
       local available = math.max(0,
