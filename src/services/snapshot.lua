@@ -322,6 +322,7 @@ function snapshot.reader(deps)
       audio_delay = property_number("audio-delay", 0) or 0,
       audio_device = property("audio-device", "auto") or "auto",
       audio_device_items = audio_device_items,
+      audio_filters = property_native("af", {}) or {},
       chapter_name = chapter_name,
       time_text = displayed_time .. " / " .. format_time(displayed_duration),
       buffering = is_buffering(),

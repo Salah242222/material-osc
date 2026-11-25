@@ -1201,11 +1201,225 @@ end
     return node
   end
 
+  -- equalizer: one firequalizer in mpv's af list, labeled so material-osc can
+  -- find and replace its own filter without touching filters from mpv.conf
+  local EQ_LABEL = "mosc-eq"
+  local eq_bands = {
+    {freq = 60, label = "60 Hz"}, {freq = 230, label = "230 Hz"},
+    {freq = 910, label = "910 Hz"}, {freq = 3600, label = "3.6 kHz"},
+    {freq = 14000, label = "14 kHz"}
+  }
+  local eq_presets = {
+    {name = "Flat", gains = {0, 0, 0, 0, 0}},
+    {name = "Bass boost", gains = {6, 3, 0, 0, 0}},
+    {name = "Treble boost", gains = {0, 0, 0, 3, 6}},
+    {name = "Vocal", gains = {-2, 0, 3, 3, 0}},
+    {name = "Loudness", gains = {4, 1, -1, 1, 4}}
+  }
+
+  -- gain (dB) per band, read back from the filter's gain entries
+  local function eq_gains_from(filters)
+    local by_freq = {}
+    for _, filter in ipairs(filters or {}) do
+      if type(filter) == "table" and filter.label == EQ_LABEL then
+        local graph = type(filter.params) == "table" and filter.params.graph or ""
+        for freq, gain in tostring(graph):gmatch("entry%((%d+),(%-?%d+)%)") do
+          by_freq[tonumber(freq)] = tonumber(gain)
+        end
+      end
+    end
+    local gains = {}
+    for index, band in ipairs(eq_bands) do gains[index] = by_freq[band.freq] or 0 end
+    return gains
+  end
+
+  local function eq_entries(gains)
+    local entries = {}
+    for index, band in ipairs(eq_bands) do
+      entries[index] = string.format("entry(%d,%d)", band.freq, gains[index] or 0)
+    end
+    return table.concat(entries, ";")
+  end
+
+  -- replaces material-osc's equalizer in af; a flat one is removed
+  local function set_eq(gains)
+    local filters, flat = {}, true
+    for _, filter in ipairs(mp.get_property_native("af") or {}) do
+      if filter.label ~= EQ_LABEL then filters[#filters + 1] = filter end
+    end
+    for index = 1, #eq_bands do
+      if (gains[index] or 0) ~= 0 then flat = false end
+    end
+    if not flat then
+      filters[#filters + 1] = {name = "lavfi", label = EQ_LABEL, params = {
+        graph = "firequalizer=gain_entry='" .. eq_entries(gains) .. "'"}}
+    end
+    mp.set_property_native("af", filters)
+  end
+
+  local function eq_preset_name(gains)
+    for _, preset in ipairs(eq_presets) do
+      local same = true
+      for index = 1, #eq_bands do
+        if (gains[index] or 0) ~= preset.gains[index] then same = false break end
+      end
+      if same then return preset.name end
+    end
+    return "Custom"
+  end
+
+  -- a vertical slider for one band: +12 dB at the top, -12 dB at the bottom
+  local function EqualizerSlider(index, band, on_change, on_done)
+    local node = {
+      gain = 0, interactive = false, dragging = false, track_top = 0, track_bottom = 0,
+      text_alpha = "00", secondary_alpha = "00", inactive_alpha = "00",
+      modifier = Modifier():fillMaxWidth():fillMaxHeight()
+    }
+    local function gain_at_pointer()
+      local half = (node.track_bottom - node.track_top) / 2
+      if half <= 0 then return node.gain end
+      local zero = node.track_top + half
+      return clamp(math.floor((zero - pointer.y) / half * 12 + 0.5), -12, 12)
+    end
+    node.modifier:pointerArea({
+      name = "equalizer-band-" .. band.freq, enabled = false,
+      on_press = function()
+        node.dragging = true
+        on_change(index, gain_at_pointer())
+      end,
+      on_move = function()
+        if node.dragging then on_change(index, gain_at_pointer()) end
+      end,
+      on_release = function()
+        if not node.dragging then return end
+        node.dragging = false
+        on_done(index, gain_at_pointer())
+      end
+    })
+    function node:update(props)
+      update_fields(self, props)
+      self.modifier.pointer_enabled = self.interactive
+    end
+    function node:measure(parent)
+      return apply_modifier_size(self.modifier, {w = 0, h = 0}, parent)
+    end
+    function node:draw(ass, bounds)
+      local x = bounds.x + bounds.w / 2
+      draw_text(ass, x, bounds.y + dp(11), self.gain == 0 and "0" or
+        string.format("%+d", self.gain), 17, "#CAC4D0", self.secondary_alpha,
+        default_text_font, 5)
+      draw_text(ass, x, bounds.y2 - dp(11), band.label, 17, "#CAC4D0",
+        self.secondary_alpha, default_text_font, 5)
+      self.track_top, self.track_bottom = bounds.y + dp(32), bounds.y2 - dp(32)
+      local half = (self.track_bottom - self.track_top) / 2
+      local zero = self.track_top + half
+      local y = zero - half * self.gain / 12
+      local track_w = dp(4)
+      draw_rect(ass, x - track_w / 2, self.track_top, x + track_w / 2,
+        self.track_bottom, "#FFFFFF", self.inactive_alpha)
+      -- filled from 0 dB to the gain, with a tick at 0 dB
+      draw_rect(ass, x - track_w / 2, math.min(y, zero), x + track_w / 2,
+        math.max(y, zero), "#FFFFFF", self.text_alpha)
+      draw_rect(ass, x - dp(8), zero - dp(1), x + dp(8), zero + dp(1),
+        "#CAC4D0", self.secondary_alpha)
+      local handle_h = self.dragging and dp(2) or dp(4)
+      draw_rect(ass, x - dp(12), y - handle_h / 2, x + dp(12), y + handle_h / 2,
+        "#FFFFFF", self.text_alpha)
+    end
+    return node
+  end
+
+  local function EqualizerPopup(on_back)
+    local node = {
+      width = dp(320), height = dp(360), interactive = false,
+      panel_alpha = "00", text_alpha = "00", secondary_alpha = "00",
+      hover_alpha = "00", gains = {}, sliders = {},
+      modifier = Modifier():clickable({
+        name = "equalizer-panel", enabled = false, on_click = function() end
+      })
+    }
+    -- gains while a slider is held, ahead of mpv's af property: the running
+    -- filter is updated with af-command so it isn't rebuilt on every step,
+    -- and af gets the final gains on release
+    local live
+    local function change(index, gain)
+      local gains = live or eq_gains_from(mp.get_property_native("af"))
+      if live and gains[index] == gain then return end
+      gains[index], live = gain, gains
+      local present = false
+      for _, filter in ipairs(mp.get_property_native("af") or {}) do
+        if filter.label == EQ_LABEL then present = true end
+      end
+      if present then
+        mp.commandv("af-command", EQ_LABEL, "gain_entry", eq_entries(gains))
+      else
+        set_eq(gains)
+      end
+      render()
+    end
+    local function done(index, gain)
+      local gains = live or eq_gains_from(mp.get_property_native("af"))
+      gains[index], live = gain, nil
+      set_eq(gains)
+    end
+    local function step_preset(direction)
+      local name = eq_preset_name(eq_gains_from(mp.get_property_native("af")))
+      set_eq(cycle_option(eq_presets, name, direction,
+        function(preset) return preset.name end).gains)
+    end
+    node.header = ChapterHeader(on_back, "Equalizer", "arrow_back", {
+      name = "equalizer-reset", icon = "restart_alt", tooltip = "Reset Equalizer",
+      on_click = function() set_eq({}) end
+    })
+    node.preset_row = SubtitleAdjustRow("equalizer-preset", "Preset",
+      function() step_preset(-1) end, function() step_preset(1) end)
+    for index, band in ipairs(eq_bands) do
+      node.sliders[index] = EqualizerSlider(index, band, change, done)
+    end
+    function node:update(props)
+      update_fields(self, props)
+      self.modifier.fixed_width, self.modifier.fixed_height = self.width, self.height
+      self.modifier.pointer_enabled = self.interactive
+      self.header:update({alpha = self.text_alpha, hover_alpha = self.hover_alpha,
+        interactive = self.interactive})
+      local gains = live or self.gains
+      self.preset_row:update({interactive = self.interactive,
+        text_alpha = self.text_alpha, secondary_alpha = self.secondary_alpha,
+        hover_alpha = self.hover_alpha, value = eq_preset_name(gains)})
+      local opacity = 1 - (tonumber(self.text_alpha, 16) or 0) / 255
+      for index, slider in ipairs(self.sliders) do
+        slider:update({interactive = self.interactive, gain = gains[index] or 0,
+          text_alpha = self.text_alpha, secondary_alpha = self.secondary_alpha,
+          inactive_alpha = ass_alpha_for_opacity(opacity * 0.4)})
+      end
+    end
+    function node:measure(parent)
+      return apply_modifier_size(self.modifier, {w = self.width, h = self.height}, parent)
+    end
+    function node:draw(ass, bounds)
+      draw_box(ass, bounds.x, bounds.y, bounds.x2, bounds.y2,
+        dp(30), "#050708", self.panel_alpha)
+      draw_node(self.header, ass, Rect({x = bounds.x, y = bounds.y,
+        w = bounds.w, h = dp(56)}))
+      draw_node(self.preset_row, ass, Rect({x = bounds.x + dp(8), y = bounds.y + dp(60),
+        w = bounds.w - dp(16), h = dp(44)}))
+      -- one column per band below the preset row
+      local area = Rect({x = bounds.x + dp(16), y = bounds.y + dp(112),
+        w = bounds.w - dp(32), h = bounds.h - dp(124)})
+      local column_w = area.w / #self.sliders
+      for index, slider in ipairs(self.sliders) do
+        draw_node(slider, ass, Rect({x = area.x + (index - 1) * column_w, y = area.y,
+          w = column_w, h = area.h}))
+      end
+    end
+    return node
+  end
+
   local function AudioSettingsPopup(on_back)
     local node = {
-      width = dp(320), height = dp(156), interactive = false,
+      width = dp(320), height = dp(200), interactive = false,
       panel_alpha = "00", text_alpha = "00", secondary_alpha = "00",
-      hover_alpha = "00", delay = 0, device = "",
+      hover_alpha = "00", delay = 0, device = "", equalizer = "Off",
       modifier = Modifier():clickable({
         name = "audio-settings-panel", enabled = false, on_click = function() end
       })
@@ -1221,12 +1435,15 @@ end
       on_click = function()
         mp.set_property_number("audio-delay", services.audio_defaults.delay)
         mp.set_property("audio-device", services.audio_defaults.device)
+        set_eq({})
       end
     })
     node.delay_row = SubtitleAdjustRow("audio-settings-delay", "Delay",
       function() shift_delay(-0.05) end, function() shift_delay(0.05) end)
     node.device_row = SettingsActionRow("audio-settings-device", "speaker",
       function() set_settings_page("audio_devices") end)
+    node.equalizer_row = SettingsActionRow("audio-settings-equalizer", "equalizer",
+      function() set_settings_page("audio_eq") end)
     function node:update(props)
       update_fields(self, props)
       self.modifier.fixed_width, self.modifier.fixed_height = self.width, self.height
@@ -1239,6 +1456,8 @@ end
       self.delay_row:update(common)
       common.label, common.value = "Device", self.device
       self.device_row:update(common)
+      common.label, common.value = "Equalizer", self.equalizer
+      self.equalizer_row:update(common)
     end
     function node:measure(parent)
       return apply_modifier_size(self.modifier, {w = self.width, h = self.height}, parent)
@@ -1249,7 +1468,7 @@ end
       draw_node(self.header, ass, Rect({x = bounds.x, y = bounds.y,
         w = bounds.w, h = dp(56)}))
       local y = bounds.y + dp(60)
-      for _, row in ipairs({self.delay_row, self.device_row}) do
+      for _, row in ipairs({self.delay_row, self.device_row, self.equalizer_row}) do
         draw_node(row, ass, Rect({x = bounds.x + dp(8), y = y,
           w = bounds.w - dp(16), h = dp(44)}))
         y = y + dp(44)
@@ -1373,6 +1592,7 @@ end
       set_settings_page("video")
     end)
     node.audio_settings = AudioSettingsPopup(function() set_settings_page("audio") end)
+    node.audio_eq = EqualizerPopup(function() set_settings_page("audio_settings") end)
     node.audio_devices = TrackPopup(function() set_settings_page("audio_settings") end, {
       name = "settings-audio-devices", title = "Audio Device",
       action_icon = "arrow_back", state = settings_state,
@@ -1506,6 +1726,9 @@ end
         self.video_shaders:update(page_props)
       elseif settings_state.page == "audio_settings" then
         page_props.delay, page_props.device = self.audio_delay, self.audio_device
+        local gains = eq_gains_from(self.audio_filters)
+        local name = eq_preset_name(gains)
+        page_props.equalizer = name == "Flat" and "Off" or name
         for _, item in ipairs(self.audio_device_items or {}) do
           if item.id == self.audio_device then page_props.device = item.label end
         end
@@ -1514,6 +1737,9 @@ end
         page_props.items = self.audio_device_items or {}
         page_props.active_id = self.audio_device
         self.audio_devices:update(page_props)
+      elseif settings_state.page == "audio_eq" then
+        page_props.gains = eq_gains_from(self.audio_filters)
+        self.audio_eq:update(page_props)
       end
     end
     function node:measure(parent)
@@ -1548,6 +1774,7 @@ end
       end
       if settings_state.page == "audio_settings" then page = self.audio_settings end
       if settings_state.page == "audio_devices" then page = self.audio_devices end
+      if settings_state.page == "audio_eq" then page = self.audio_eq end
       if page then
         push_clip(bounds)
         page:draw(ass, bounds)
@@ -1695,7 +1922,8 @@ end
           settings_state.page == "video_aspect" then desired_h = dp(164)
         elseif settings_state.page == "video_shaders" and item_count == 0 then
           desired_h = dp(116)
-        elseif settings_state.page == "audio_settings" then desired_h = dp(156)
+        elseif settings_state.page == "audio_settings" then desired_h = dp(200)
+        elseif settings_state.page == "audio_eq" then desired_h = dp(360)
         else
           local has_footer = settings_state.page == "subtitles" or
             settings_state.page == "secondary_subtitles" or
@@ -1776,6 +2004,7 @@ end
         props.audio_delay = snapshot.audio_delay or 0
         props.audio_device = snapshot.audio_device or "auto"
         props.audio_device_items = snapshot.audio_device_items or {}
+        props.audio_filters = snapshot.audio_filters or {}
         popup:update(props)
       end
     })

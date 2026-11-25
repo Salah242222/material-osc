@@ -263,7 +263,7 @@ function mpv_runtime.new(args)
       {"sub-outline-size", "number"}, {"sub-color", "string"},
       {"sub-font", "string"}, {"volume-max", "number"},
       {"audio-delay", "number"}, {"audio-device", "string"},
-      {"audio-device-list", "native"}
+      {"audio-device-list", "native"}, {"af", "native"}
     }) do
       local name = property[1]
       mp.observe_property(name, property[2], function(_, value)
