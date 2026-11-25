@@ -399,10 +399,12 @@ local function create_app(services)
     if show_window_controls then
       local controls_size = ui.measure_node(self.window_controls, root)
       ui.draw_node(self.window_drag_area, ass, root)
+      -- reveal the buttons near their corner, not along the whole top edge
+      local reveal_w = math.min(root.w, controls_size.w + ui.dp(48))
       state.window_controls.reveal_bounds = ui.Rect({
-        x = root.x,
+        x = root.x2 - reveal_w,
         y = root.y,
-        w = root.w,
+        w = reveal_w,
         h = math.max(controls_size.h, ui.edge_seek_top_inset())
       })
       -- Measure and register button hitboxes in the retained base pass, but
