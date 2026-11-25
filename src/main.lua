@@ -400,7 +400,7 @@ local function create_app(services)
       local controls_size = ui.measure_node(self.window_controls, root)
       ui.draw_node(self.window_drag_area, ass, root)
       -- reveal the buttons near their corner, not along the whole top edge
-      local reveal_w = math.min(root.w, controls_size.w + ui.dp(48))
+      local reveal_w = math.min(root.w, controls_size.w)
       state.window_controls.reveal_bounds = ui.Rect({
         x = root.x2 - reveal_w,
         y = root.y,
