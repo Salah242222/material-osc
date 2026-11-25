@@ -84,6 +84,17 @@ function thumbnail.new(deps)
     local bottom_gap = dp(18)
     local margin = dp(8)
     local frame_pad = dp(1)
+    -- a window not much bigger than the thumbnail has no room for it above
+    -- the seekbar, so show only the time pill
+    if has_thumbnail and (thumb_w > viewport.w - margin * 2 or
+      seek_y - bottom_gap - pill_h - gap - thumb_h - frame_pad * 2 < margin) then
+      has_thumbnail, thumb_w, thumb_h = false, 0, 0
+    end
+    -- and skip the pill too once even that would not fit
+    if seek_y - bottom_gap - pill_h < margin then
+      enqueue_effect("thumbnail-clear", function() thumbnail_service:clear() end)
+      return
+    end
     local time_pill_w = text_intrinsic_width(time_text, pill_text_size) +
                 pill_horizontal_padding * 2
 
