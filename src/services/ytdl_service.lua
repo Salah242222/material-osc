@@ -125,7 +125,7 @@ function ytdl_service.new(args)
     end
     if not ytdl_service.supports(path) then
       state.active, state.source, state.url, state.is_live = false, nil, nil, nil
-      state.items, state.caption_items = {}, {}
+      state.items, state.caption_items, state.heatmap = {}, {}, nil
       state.selected_id, state.pending_selected_id = nil, nil
       state.pending_playback_url = nil
       return
@@ -138,6 +138,7 @@ function ytdl_service.new(args)
     state.request_id = state.request_id + 1
     local request_id = state.request_id
     state.items, state.caption_items, state.selected_id, state.is_live = {}, {}, nil, nil
+    state.heatmap = nil
     state.active, state.source, state.url = true, "youtube", path
     local function apply(data)
         if not data or type(data.formats) ~= "table" then return false end
@@ -193,6 +194,8 @@ function ytdl_service.new(args)
         end
         table.sort(captions, function(a, b) return a.label < b.label end)
         state.caption_items = captions
+        -- YouTube's "Most replayed" data: {start_time, end_time, value 0..1}
+        state.heatmap = type(data.heatmap) == "table" and data.heatmap or nil
         args.render()
         return true
     end

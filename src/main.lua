@@ -925,6 +925,7 @@ draw_seekbar = seekbar_renderer_module.new({
   runtime = runtime, opts = opts, dp = dp, clamp = clamp,
   mouse_in = mouse_in, draw_rect = draw_rect, draw_box = draw_box,
   draw_boxes = draw_boxes,
+  draw_polygon = function(...) return ui_renderer:draw_polygon(...) end,
   seek_pos_from_mouse = seek_pos_from_mouse,
   draw_thumbnail_preview = draw_thumbnail_preview,
   sponsorblock_category_style = sponsorblock_module.category_style,

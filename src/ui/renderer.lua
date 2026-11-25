@@ -219,6 +219,19 @@ function renderer.new(args)
       math.min(x2 - x1, y2 - y1) / 2, color, alpha)
   end
 
+  -- a filled shape through points {x, y}
+  function service:draw_polygon(ass, points, color, alpha)
+    if not points or #points < 3 then return end
+    ass:new_event(); ass:pos(0, 0); ass:an(7)
+    ass:append(string.format("{\\1c&H%s&\\1a&H%s&\\bord0\\shad0}",
+      self:ass_color(color), self:fade_alpha(alpha)))
+    append_clip(ass)
+    ass:draw_start()
+    ass:move_to(points[1].x, points[1].y)
+    for index = 2, #points do ass:line_to(points[index].x, points[index].y) end
+    ass:draw_stop()
+  end
+
   function service:draw_boxes(ass, boxes, color, alpha)
     if not boxes or #boxes == 0 then return end
     ass:new_event(); ass:pos(0, 0); ass:an(7)

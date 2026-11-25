@@ -93,6 +93,45 @@ function seekbar_renderer.new(deps)
     end
   end
 
+  -- YouTube's "Most replayed" graph from yt-dlp's heatmap, as a smooth
+  -- filled curve standing on the track
+  local function draw_heatmap(ass, x1, x2, base_y, duration)
+    local heatmap = runtime.ytdl and runtime.ytdl.heatmap
+    if type(heatmap) ~= "table" or #heatmap < 2 or duration <= 0 then return end
+    local height = dp(32)
+    local samples = {}
+    for _, entry in ipairs(heatmap) do
+      local from, to = tonumber(entry.start_time), tonumber(entry.end_time)
+      local value = tonumber(entry.value)
+      if from and to and value then
+        samples[#samples + 1] = {
+          x = x1 + (x2 - x1) * clamp((from + to) / 2 / duration, 0, 1),
+          y = base_y - height * clamp(value, 0, 1)
+        }
+      end
+    end
+    if #samples < 2 then return end
+    -- Catmull-Rom between the samples, kept between the base and the top
+    local points = {{x = samples[1].x, y = base_y}}
+    for index = 1, #samples - 1 do
+      local p0, p1 = samples[math.max(1, index - 1)], samples[index]
+      local p2, p3 = samples[index + 1], samples[math.min(#samples, index + 2)]
+      for step = 0, 3 do
+        local t = step / 4
+        local t2, t3 = t * t, t * t * t
+        local function blend(a, b, c, d)
+          return 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 +
+            (3 * b - a - 3 * c + d) * t3)
+        end
+        points[#points + 1] = {x = blend(p0.x, p1.x, p2.x, p3.x),
+          y = clamp(blend(p0.y, p1.y, p2.y, p3.y), base_y - height, base_y)}
+      end
+    end
+    points[#points + 1] = samples[#samples]
+    points[#points + 1] = {x = samples[#samples].x, y = base_y}
+    deps.draw_polygon(ass, points, "#FFFFFF", "B8")
+  end
+
   local function draw_seekbar(ass, x1, y, x2)
     runtime.seek.preview_bounds = nil
     runtime.seek.position_pill_visible = false
@@ -234,13 +273,16 @@ function seekbar_renderer.new(deps)
     local hovering_seek = runtime.controller.visible and mouse_in(preview_area)
     runtime.seek.position_pill_visible =
       runtime.seek.dragging or hovering_seek
+    local precise_active = precise_seek and precise_seek:active()
+    if (runtime.seek.dragging or hovering_seek) and not precise_active then
+      draw_heatmap(ass, x1, x2, seek_y - dp(4), duration)
+    end
     local handle_h = dp(hovering_seek and 24 or 22)
     local handle_y = seek_y + seek_h / 2
     draw_box(ass, handle_x - handle_w / 2, handle_y - handle_h / 2,
          handle_x + handle_w / 2, handle_y + handle_h / 2, handle_w / 2,
          opts.accent_color, "00")
-  
-    local precise_active = precise_seek and precise_seek:active()
+
     if precise_active then
       draw_precise(ass, x1, x2, seek_y, duration)
       enqueue_effect("thumbnail-clear", function() thumbnail_service:clear() end)
