@@ -1082,6 +1082,10 @@ playback_indicator = playback_indicator_module.new({
 toast_service:bind(playback_indicator)
 services.playback_indicator = playback_indicator
 services.loading = {draw = draw_loading_shape_morph}
+services.resume_notice = require("src.services.resume_notice").new({
+  mp = mp, opts = opts, indicator = playback_indicator, format_time = format_time,
+  render = function() if render then render() end end
+})
 local temporary_speed = temporary_speed_module.new({
   state = runtime.temporary_speed,
   mp = mp,

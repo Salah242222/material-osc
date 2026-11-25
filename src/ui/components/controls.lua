@@ -522,8 +522,12 @@ function controls.new(services)
       self.persistent = true
       self.suppressed = suppressed == true
       local presence = state.sponsorblock.actions_opacity
-      local desired_actions = services.sponsorblock and
-        services.sponsorblock:prompt_actions() or {}
+      local desired_actions = {}
+      for _, source in ipairs({services.sponsorblock and
+          services.sponsorblock:prompt_actions() or {},
+          services.resume_notice and services.resume_notice:actions() or {}}) do
+        for _, action in ipairs(source) do desired_actions[#desired_actions + 1] = action end
+      end
       local desired_signature = actions_signature(desired_actions)
       local now = ui.now()
 
