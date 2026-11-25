@@ -567,7 +567,11 @@ function playlist.new(services, trailing)
       local morphing = playlist_state.animation:is_running() or
         playlist_state.width_animation:is_running() or
         playlist_state.height_animation:is_running()
+      -- in a window too short for all the controls this row would be cut off
+      -- at the top, so leave it empty (Alt+P still opens the playlist)
+      local clipped = bounds.y < 0
       if is_render_pass("interaction") then
+        if clipped then return end
         if self.morph == 0 and not playlist_state.open and
           not morphing then
           draw_control_buttons(ass, source, source, 0)
@@ -579,6 +583,7 @@ function playlist.new(services, trailing)
       end
       if not is_render_pass("base") then return end
       playlist_state.anchor_bounds = source
+      if clipped then return end
       if self.morph == 0 and not playlist_state.open and
         not morphing and #footer_buttons() > 0 then
         draw_box(ass, source.x, source.y, source.x2, source.y2,
