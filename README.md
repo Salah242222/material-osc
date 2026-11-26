@@ -37,6 +37,7 @@ material-osc can be customized with a `material-osc.conf` file in mpv's
 | `screenshot_button` | `yes` | `yes`, `no` | Shows or hides the screenshot button in the playback controls. |
 | `pip_button` | `yes` | `yes`, `no` | Shows or hides the Picture-in-Picture button in the playback controls. |
 | `volume_slider` | `vertical` | `vertical`, `horizontal` | Opens the volume slider above the volume button, or beside it to the right. |
+| `controls_animation` | `slide` | `slide`, `fade` | Slides the controls in from the window's edges and reveals the seekbar from the pointer, or fades them all in and out. |
 | `ontop_button` | `no` | `yes`, `no` | Shows a pin button in the playback controls that toggles always-on-top. It stays highlighted while pinned. |
 | `info_button` | `no` | `yes`, `no` | Shows an info button in the playback controls that runs `info_mbtn_left_command`. |
 | `info_mbtn_left_command` | `"script-binding stats/display-page-1-toggle"` | Any mpv input command | Command run by the info button. The default toggles the stats overlay. |

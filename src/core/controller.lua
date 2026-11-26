@@ -34,8 +34,15 @@ function controller.new(args)
       -- turned around mid-slide, as the pointer darts in and out: catch up
       -- at twice the speed
       spring.stiffness, spring.damping = 1680, 64
+    else
+      -- the seekbar's reveal grows from (and shrinks back to) the pointer
+      local pointer = runtime.pointer
+      local inside = pointer.x >= 0 and pointer.y >= 0
+      runtime.controller.reveal_x = inside and pointer.x or nil
+      runtime.controller.reveal_y = inside and pointer.y or nil
     end
     spring:set_target(target, mp.get_time(), 0.18)
+    runtime.controller.reveal:set_target(target, mp.get_time())
     if not visible then args.thumbnail:clear() end
     if args.render_visibility then args.render_visibility()
     else args.render() end

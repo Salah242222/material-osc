@@ -49,6 +49,8 @@ local definitions = {
   {name = "pip_button", default = true, group = "appearance"},
   {name = "volume_slider", default = "vertical", group = "appearance",
     normalize = enum("vertical", {"vertical", "horizontal"})},
+  {name = "controls_animation", default = "slide", group = "appearance",
+    normalize = enum("slide", {"slide", "fade"})},
   {name = "ontop_button", default = false, group = "appearance"},
   {name = "info_button", default = false, group = "appearance"},
   {name = "prev_next_beside_play", default = false, group = "appearance"},

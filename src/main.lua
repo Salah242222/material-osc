@@ -822,6 +822,7 @@ local bookmark_service = bookmark_service_module.new({
     elseif render then
       runtime.controller.visible = not active
       runtime.controller.opacity:set_target(active and 0 or 1, mp.get_time(), 0.18)
+      runtime.controller.reveal:set_target(active and 0 or 1, mp.get_time())
       render()
     end
   end
@@ -1028,10 +1029,73 @@ local services = {
     toggle_brand_logo = function() return brand_logo:toggle() end,
     draw_text = draw_text, draw_seekbar = draw_seekbar,
     draw_shadowed_text = draw_shadowed_text,
+    -- the controls slide in and out unless controls_animation is "fade"
+    sliding = function() return opts.controls_animation ~= "fade" end,
     without_fade = function(draw)
-      ui_renderer.fade_suspended = true
+      if opts.controls_animation == "fade" then return draw() end
+      ui_renderer.fade_opacity = 1
       draw()
-      ui_renderer.fade_suspended = false
+      ui_renderer.fade_opacity = nil
+    end,
+    -- shows the seekbar (area: its x1, x2 and line y) inside a circle that
+    -- grows from where the pointer was as the controller shows (from the
+    -- playback position without a pointer) and shrinks back as it hides;
+    -- fainter rings around its edge soften it like a blur
+    reveal = function(area, draw)
+      -- hiding keeps the slide's pace, so it's gone when the controls are
+      local progress = math.min(clamp(runtime.controller.opacity.value, 0, 1),
+        runtime.controller.reveal.value)
+      if progress >= 0.999 or opts.controls_animation == "fade" then
+        return draw()
+      end
+      local cx, cy = runtime.controller.reveal_x, runtime.controller.reveal_y
+      if not cx then
+        local duration = runtime.snapshot.duration or 0
+        local ratio = duration > 0 and
+          clamp((runtime.snapshot.position or 0) / duration, 0, 1) or 0.5
+        cx, cy = area.x1 + (area.x2 - area.x1) * ratio, area.y
+      end
+      -- grow only until the seekbar's far end is covered, so the whole
+      -- animation is visible motion
+      local reach = math.max(math.abs(area.x1 - cx), math.abs(area.x2 - cx))
+      reach = math.sqrt(reach ^ 2 + (area.y - cy) ^ 2) + dp(14)
+      local max_feather, bands = dp(56), 5
+      local radius = progress * (reach + max_feather)
+      -- a crisp edge while the circle is small, softening as it grows
+      local feather = math.min(max_feather, radius * 0.4)
+      local function circle(r, reverse)
+        local k = r * 0.5523
+        local points = reverse and {
+          {r, 0}, {r, -k, k, -r, 0, -r}, {-k, -r, -r, -k, -r, 0},
+          {-r, k, -k, r, 0, r}, {k, r, r, k, r, 0}
+        } or {
+          {r, 0}, {r, k, k, r, 0, r}, {-k, r, -r, k, -r, 0},
+          {-r, -k, -k, -r, 0, -r}, {k, -r, r, -k, r, 0}
+        }
+        local path = {}
+        for index, p in ipairs(points) do
+          local coords = {}
+          for i = 1, #p, 2 do
+            coords[#coords + 1] = string.format("%d %d",
+              math.floor(cx + p[i] + 0.5), math.floor(cy + p[i + 1] + 0.5))
+          end
+          path[#path + 1] = (index == 1 and "m " or "b ") .. table.concat(coords, " ")
+        end
+        return table.concat(path, " ")
+      end
+      for band = 0, bands do
+        local outer = radius - feather + band * feather / bands
+        local inner = band > 0 and outer - feather / bands or 0
+        if outer > 0 then
+          ui_renderer.vector_clip = circle(outer) ..
+            (inner > 0 and " " .. circle(inner, true) or "")
+          -- a smooth (cosine) falloff across the rings
+          ui_renderer.fade_opacity =
+            0.5 + 0.5 * math.cos(math.pi * band / (bands + 1))
+          draw()
+        end
+      end
+      ui_renderer.vector_clip, ui_renderer.fade_opacity = nil, nil
     end,
     push_clip = function(bounds) ui_renderer:push_clip(bounds) end,
     pop_clip = function() ui_renderer:pop_clip() end,

@@ -51,6 +51,7 @@ function controls.new(services)
       state.controller.visible = false
       state.controller.pointer_timed_out = true
       state.controller.opacity:snap(0)
+      state.controller.reveal:snap(0)
       mp.set_property_bool("fullscreen", false)
       mp.set_property_bool("window-maximized", false)
       -- resize before pinning: on Windows a geometry change made right after
@@ -402,7 +403,10 @@ function controls.new(services)
     function node:draw(ass, bounds)
       self.bounds = bounds
       if not is_render_pass("dynamic") then return end
-      draw_seekbar(ass, bounds.x, bounds.y + dp(14), bounds.x2)
+      local y = bounds.y + dp(14)
+      ui.reveal({x1 = bounds.x, x2 = bounds.x2, y = y}, function()
+        draw_seekbar(ass, bounds.x, y, bounds.x2)
+      end)
     end
     return node
   end
@@ -1047,7 +1051,7 @@ function controls.new(services)
       end
       state.seek.precise.strip_bounds = nil
       -- slide up from below the window as the controller shows
-      local hidden = 1 - state.controller.opacity.value
+      local hidden = ui.sliding() and 1 - state.controller.opacity.value or 0
       bounds = Rect({x = bounds.x, w = bounds.w, h = bounds.h,
         y = bounds.y + hidden * (state.viewport.h - bounds.y)})
       ui.without_fade(function()

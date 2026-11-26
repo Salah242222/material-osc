@@ -5,6 +5,7 @@ function animation_coordinator.new(args)
   local service = {}
   local animations = {
     runtime.controller.opacity,
+    runtime.controller.reveal,
     runtime.window_controls.opacity,
     runtime.volume.animation,
     runtime.context_menu.animation,
@@ -178,6 +179,7 @@ function animation_coordinator.new(args)
       runtime.controller.opacity.stiffness = 420
       runtime.controller.opacity.damping = 32
     end
+    runtime.controller.reveal:update(now)
     local follows_controller = args.show_window_controls_with_controller and
       args.show_window_controls_with_controller()
     local window_controls_visible = runtime.window_controls.hovered or

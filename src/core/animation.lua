@@ -97,7 +97,8 @@ function animation.tween(args)
   function value:update(now)
     if not self.running then return self.value end
     local progress = clamp((now - self.started_at) / math.max(0.001, self.duration), 0, 1)
-    local eased = progress * progress * (3 - 2 * progress)
+    local eased = args.ease and args.ease(progress) or
+      progress * progress * (3 - 2 * progress)
     self.value = self.from + (self.target - self.from) * eased
     if progress >= 1 then self.value, self.running = self.target, false end
     return self.value

@@ -562,8 +562,8 @@ function playlist.new(services, trailing)
         playlist_state.width_animation:is_running() or
         playlist_state.height_animation:is_running()
       -- the buttons and title slide in from the left as the controller shows
-      local shift = (1 - state.controller.opacity.value) *
-        (self.slide_extent or source.x2)
+      local shift = ui.sliding() and (1 - state.controller.opacity.value) *
+        (self.slide_extent or source.x2) or 0
       local shown = Rect({x = source.x - shift, y = source.y,
         w = source.w, h = source.h})
       if is_render_pass("interaction") then

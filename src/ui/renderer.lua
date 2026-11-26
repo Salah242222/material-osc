@@ -63,12 +63,16 @@ function renderer.new(args)
 
   function service:fade_alpha(alpha)
     alpha = alpha or "00"
-    -- controls that slide in and out are drawn without the fade
-    if self.fade_suspended then return alpha end
-    local cached = frame_fade_cache[alpha]
+    -- controls that slide in and out (fade_opacity 1) and the seekbar's
+    -- reveal set their own opacity instead of the controller's fade
+    local opacity = self.fade_opacity
+    local cached = not opacity and frame_fade_cache[alpha]
     if cached then return cached end
     local base = tonumber(alpha or "00", 16) or 0
-    local opacity = self:clamp(runtime.controller.opacity.value, 0, 1)
+    if opacity then
+      return string.format("%02X", math.floor(255 - (255 - base) * opacity + 0.5))
+    end
+    opacity = self:clamp(runtime.controller.opacity.value, 0, 1)
     local converted =
       string.format("%02X", math.floor(255 - (255 - base) * opacity + 0.5))
     frame_fade_cache[alpha] = converted
@@ -120,6 +124,10 @@ function renderer.new(args)
   end
 
   local function append_clip(ass, bounds)
+    if service.vector_clip then
+      ass:append("{\\clip(" .. service.vector_clip .. ")}")
+      return
+    end
     local active = clip_stack[#clip_stack]
     if active and bounds then
       bounds = {

@@ -132,6 +132,12 @@ function application_state.new(args)
   runtime.controller.opacity = animation.spring({
     initial = opts.show_on_mouse_move and 1 or 0, stiffness = 420, damping = 32
   })
+  -- the seekbar's circular reveal, slower than the slide; it starts fast
+  -- and settles gently
+  runtime.controller.reveal = animation.tween({
+    initial = opts.show_on_mouse_move and 1 or 0, duration = 0.35,
+    ease = function(t) return 1 - (1 - t) ^ 3 end
+  })
   runtime.window_controls.opacity = animation.tween({
     initial = 0, duration = 0.16
   })
