@@ -1028,6 +1028,11 @@ local services = {
     toggle_brand_logo = function() return brand_logo:toggle() end,
     draw_text = draw_text, draw_seekbar = draw_seekbar,
     draw_shadowed_text = draw_shadowed_text,
+    without_fade = function(draw)
+      ui_renderer.fade_suspended = true
+      draw()
+      ui_renderer.fade_suspended = false
+    end,
     push_clip = function(bounds) ui_renderer:push_clip(bounds) end,
     pop_clip = function() ui_renderer:pop_clip() end,
     draw_loading = draw_loading_shape_morph, mouse_in = mouse_in,
@@ -1288,6 +1293,9 @@ local renderer = frame_runtime.renderer.new({
       draw_overlay_layer("modal", "modal", true)
     end
     local controller_bounds = runtime.controller.bounds
+    -- the subtitles keep pace with the controls, sped up or not
+    subtitle_position.offset_animation.stiffness = runtime.controller.opacity.stiffness
+    subtitle_position.offset_animation.damping = runtime.controller.opacity.damping
     subtitle_position:update(
       controller_bounds and controller_bounds.h or 0,
       runtime.controller.opacity.target,

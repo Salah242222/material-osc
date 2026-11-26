@@ -1046,17 +1046,25 @@ function controls.new(services)
         return
       end
       state.seek.precise.strip_bounds = nil
-      draw_node(self.starting, ass, bounds)
-      draw_node(self.ending_actions, ass, bounds)
+      -- slide up from below the window as the controller shows
+      local hidden = 1 - state.controller.opacity.value
+      bounds = Rect({x = bounds.x, w = bounds.w, h = bounds.h,
+        y = bounds.y + hidden * (state.viewport.h - bounds.y)})
+      ui.without_fade(function()
+        draw_node(self.starting, ass, bounds)
+        draw_node(self.ending_actions, ass, bounds)
+      end)
     end
 
     function node:draw_dynamic(ass)
       if precise_seeking() then return end
-      if self.volume.bounds then self.volume:draw(ass, self.volume.bounds) end
-      if self.time.bounds then self.time:draw(ass, self.time.bounds) end
-      if self.cached.visible and self.cached_time.bounds then
-        self.cached_time:draw(ass, self.cached_time.bounds)
-      end
+      ui.without_fade(function()
+        if self.volume.bounds then self.volume:draw(ass, self.volume.bounds) end
+        if self.time.bounds then self.time:draw(ass, self.time.bounds) end
+        if self.cached.visible and self.cached_time.bounds then
+          self.cached_time:draw(ass, self.cached_time.bounds)
+        end
+      end)
     end
 
     function node:draw_volume_interaction(ass)

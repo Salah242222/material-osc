@@ -63,6 +63,8 @@ function renderer.new(args)
 
   function service:fade_alpha(alpha)
     alpha = alpha or "00"
+    -- controls that slide in and out are drawn without the fade
+    if self.fade_suspended then return alpha end
     local cached = frame_fade_cache[alpha]
     if cached then return cached end
     local base = tonumber(alpha or "00", 16) or 0

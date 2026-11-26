@@ -561,10 +561,17 @@ function playlist.new(services, trailing)
       local morphing = playlist_state.animation:is_running() or
         playlist_state.width_animation:is_running() or
         playlist_state.height_animation:is_running()
+      -- the buttons and title slide in from the left as the controller shows
+      local shift = (1 - state.controller.opacity.value) *
+        (self.slide_extent or source.x2)
+      local shown = Rect({x = source.x - shift, y = source.y,
+        w = source.w, h = source.h})
       if is_render_pass("interaction") then
         if self.morph == 0 and not playlist_state.open and
           not morphing then
-          draw_control_buttons(ass, source, source, 0)
+          ui.without_fade(function()
+            draw_control_buttons(ass, shown, shown, 0)
+          end)
         end
         if trailing_size.w > 0 then
           draw_node(self.trailing, ass, trailing_bounds)
@@ -573,22 +580,26 @@ function playlist.new(services, trailing)
       end
       if not is_render_pass("base") then return end
       playlist_state.anchor_bounds = source
-      if self.morph == 0 and not playlist_state.open and
-        not morphing then
-        draw_box(ass, source.x, source.y, source.x2, source.y2,
-          source.h / 2, "#050708",
-          alpha(self.controls_opacity * (1 - 0x58 / 255)))
-        draw_control_buttons(ass, source, source, 0)
-      end
       local title = self.snapshot.media_title or ""
       local title_x = bounds.x + source.w + dp(12)
       local trailing_gap = trailing_size.w > 0 and dp(12) or dp(8)
       local available = math.max(0,
         trailing_bounds.x - title_x - trailing_gap)
       title = truncate_to_width(title, available, 24)
-      ui.draw_shadowed_text(ass, title_x, bounds.y + bounds.h / 2,
-        title, 24, "#FFFFFF", alpha(self.controls_opacity),
-        default_text_font, 4)
+      -- far enough to take the title past the window's left edge
+      self.slide_extent = title_x + ui.text_width(title, 24) + dp(8)
+      ui.without_fade(function()
+        if self.morph == 0 and not playlist_state.open and
+          not morphing then
+          draw_box(ass, shown.x, shown.y, shown.x2, shown.y2,
+            shown.h / 2, "#050708",
+            alpha(self.controls_opacity * (1 - 0x58 / 255)))
+          draw_control_buttons(ass, shown, shown, 0)
+        end
+        ui.draw_shadowed_text(ass, title_x - shift, bounds.y + bounds.h / 2,
+          title, 24, "#FFFFFF", alpha(self.controls_opacity),
+          default_text_font, 4)
+      end)
       if trailing_size.w > 0 then
         draw_node(self.trailing, ass, trailing_bounds)
       end

@@ -29,7 +29,13 @@ function controller.new(args)
     elseif was_visible then
       runtime.controller.hide_cursor_after_fade = true
     end
-    runtime.controller.opacity:set_target(target, mp.get_time(), 0.18)
+    local spring = runtime.controller.opacity
+    if spring:is_running() then
+      -- turned around mid-slide, as the pointer darts in and out: catch up
+      -- at twice the speed
+      spring.stiffness, spring.damping = 1680, 64
+    end
+    spring:set_target(target, mp.get_time(), 0.18)
     if not visible then args.thumbnail:clear() end
     if args.render_visibility then args.render_visibility()
     else args.render() end

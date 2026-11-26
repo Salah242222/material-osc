@@ -37,6 +37,7 @@ function animation_coordinator.new(args)
   }
 
   function service:is_running()
+    if runtime.controller.settled then return true end
     for _, value in ipairs(animations) do
       if value:is_running() then return true end
     end
@@ -63,11 +64,6 @@ function animation_coordinator.new(args)
       runtime.settings.height_animation:is_running() then
       return base
     end
-    -- Controller fades touch three retained layers, so 45 Hz is a better
-    -- quality/cost point than driving all of them at a 60+ Hz display rate.
-    if runtime.controller.opacity:is_running() then
-      return math.max(base, 1 / 45)
-    end
     for _, value in ipairs(animations) do
       if value:is_running() then
         if value.running or math.abs(value.target - value.value) > 0.015 or
@@ -83,6 +79,11 @@ function animation_coordinator.new(args)
     -- a horizontal volume slider moves the time display, which is laid out
     -- with the rest of the controls
     if runtime.volume.animation:is_running() and args.horizontal_volume() then
+      return "full"
+    end
+    -- the controls slid while their hitboxes stayed put; place them again
+    if runtime.controller.settled then
+      runtime.controller.settled = false
       return "full"
     end
     if runtime.playlist.controls_opacity:is_running() or
@@ -169,7 +170,14 @@ function animation_coordinator.new(args)
   end
 
   function service:update(now)
+    local sliding = runtime.controller.opacity:is_running()
     runtime.controller.opacity:update(now)
+    if sliding and not runtime.controller.opacity:is_running() then
+      runtime.controller.settled = true
+      -- back to the subtitles' pace after a sped-up turn
+      runtime.controller.opacity.stiffness = 420
+      runtime.controller.opacity.damping = 32
+    end
     local follows_controller = args.show_window_controls_with_controller and
       args.show_window_controls_with_controller()
     local window_controls_visible = runtime.window_controls.hovered or

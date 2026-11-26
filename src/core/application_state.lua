@@ -128,8 +128,9 @@ function application_state.new(args)
     }
   }
 
-  runtime.controller.opacity = animation.tween({
-    initial = opts.show_on_mouse_move and 1 or 0, duration = 0.18
+  -- the same spring that lifts the subtitles, so the controls move with them
+  runtime.controller.opacity = animation.spring({
+    initial = opts.show_on_mouse_move and 1 or 0, stiffness = 420, damping = 32
   })
   runtime.window_controls.opacity = animation.tween({
     initial = 0, duration = 0.16
