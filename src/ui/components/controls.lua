@@ -973,7 +973,6 @@ function controls.new(services)
       self.tiny = compact and state.viewport.w < dp(360)
       state.controller.tiny = self.tiny
       self.screenshot_visibility:set_visible(config.opts.screenshot_button and not compact)
-      self.ontop_visibility:set_visible(config.opts.ontop_button and not compact)
       self.info_visibility:set_visible(config.opts.info_button and not compact)
       self.chapter_name = snapshot.chapter_name
       if static_changed then
@@ -1056,6 +1055,7 @@ function controls.new(services)
       self.chapter:set_visible(false)
       self.time_visibility:set_visible(not self.tiny)
       self.pip_visibility:set_visible(config.opts.pip_button)
+      self.ontop_visibility:set_visible(config.opts.ontop_button)
       local function overflows()
         return measure_node(self.starting, bounds).w + dp(16) +
           measure_node(self.ending_actions, bounds).w > bounds.w
@@ -1068,7 +1068,10 @@ function controls.new(services)
       if not self.tiny and overflows() then
         self.time_visibility:set_visible(false)
       end
-      -- picture-in-picture goes last, once even it would not fit
+      -- then the pin, and picture-in-picture last, once even it would not fit
+      if config.opts.ontop_button and overflows() then
+        self.ontop_visibility:set_visible(false)
+      end
       if config.opts.pip_button and overflows() then
         self.pip_visibility:set_visible(false)
       end
