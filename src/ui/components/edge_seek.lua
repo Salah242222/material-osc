@@ -39,13 +39,19 @@ function edge_seek.new(services)
         visual.holding = false
         timers:after(visual, "hold_timer", 0.4, function()
           visual.holding = true
+          -- a paused video plays while held and pauses again on release
+          visual.was_paused = mp.get_property_bool("pause", false)
+          if visual.was_paused then mp.set_property_bool("pause", false) end
           services.temporary_speed:activate()
         end)
       end
       bounds.on_cancel = function()
         timers:cancel(visual, "hold_timer")
-        if visual.holding then services.temporary_speed:deactivate() end
-        visual.holding = false
+        if visual.holding then
+          services.temporary_speed:deactivate()
+          if visual.was_paused then mp.set_property_bool("pause", true) end
+        end
+        visual.holding, visual.was_paused = false, false
       end
       bounds.on_release = function()
         local held = visual.holding
