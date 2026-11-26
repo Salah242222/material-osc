@@ -943,9 +943,10 @@ function controls.new(services)
     node.ending = Pill({
       gap = 0,
       children = {
+        -- the pin sits with picture-in-picture: both keep the window on top
         node.subtitles_visibility, node.screenshot_visibility,
-        node.pip_visibility, node.settings, node.info_visibility,
-        node.ontop_visibility, node.fullscreen
+        node.pip_visibility, node.ontop_visibility, node.settings,
+        node.info_visibility, node.fullscreen
       },
       modifier = Modifier()
     })
