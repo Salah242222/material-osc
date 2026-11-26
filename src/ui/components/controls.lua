@@ -1205,7 +1205,17 @@ function controls.new(services)
     end
 
     function node:draw(ass, bounds)
-      local opacity = clamp(state.window_controls.opacity.value, 0, 1)
+      local shown = state.window_controls.opacity.value
+      local opacity = clamp(shown, 0, 1)
+      if ui.sliding() then
+        -- drop in from above the window like the controls slide up; the base
+        -- pass only places the click areas, so they stay where it comes to rest
+        if is_render_pass("interaction") then
+          bounds = Rect({x = bounds.x, w = bounds.w, h = bounds.h,
+            y = bounds.y - (1 - shown) * bounds.y2})
+        end
+        opacity = 1
+      end
       local icon_alpha = ass_alpha_for_opacity(opacity)
       self.pill.modifier.background_alpha =
         faded_alpha(self.pill_base_alpha, opacity)

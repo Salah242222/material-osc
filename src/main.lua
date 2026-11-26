@@ -920,7 +920,8 @@ thumbnail_service, draw_thumbnail_preview = thumbnail_module.new({
   draw_box = function(...) return draw_box(...) end,
   draw_text = function(...) return draw_text(...) end,
   text_intrinsic_width = text_intrinsic_width,
-  truncate_utf8_to_width = truncate_utf8_to_width
+  truncate_utf8_to_width = truncate_utf8_to_width,
+  presence = function() return runtime.seek.preview_opacity.value end
 })
 draw_seekbar = seekbar_renderer_module.new({
   runtime = runtime, opts = opts, dp = dp, clamp = clamp,

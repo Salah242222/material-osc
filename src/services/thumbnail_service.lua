@@ -75,7 +75,15 @@ function thumbnail.new(deps)
     local pill_text_size = 22
     local pill_vertical_padding = dp(4)
     local pill_horizontal_padding = dp(12)
-    local pill_background_alpha = "33"
+    -- the pills and frame fade in as the preview appears (the thumbnail
+    -- image itself is thumbfast's overlay, which can't fade)
+    local presence = deps.presence and deps.presence() or 1
+    local function faded(alpha)
+      local opacity = (1 - (tonumber(alpha, 16) or 0) / 255) * presence
+      return string.format("%02X", math.floor(255 - 255 * opacity + 0.5))
+    end
+    local pill_background_alpha = faded("33")
+    local text_alpha = faded("00")
     local thumb_w = has_thumbnail and state.width or 0
     local thumb_h = has_thumbnail and state.height or 0
     local pill_h = dp(pill_text_size) + pill_vertical_padding * 2
@@ -83,7 +91,7 @@ function thumbnail.new(deps)
     local pill_gap = dp(6)
     local bottom_gap = dp(18)
     local margin = dp(8)
-    local frame_pad = dp(1)
+    local frame_pad = dp(2)
     local time_pill_w = text_intrinsic_width(time_text, pill_text_size) +
                 pill_horizontal_padding * 2
 
@@ -142,7 +150,8 @@ function thumbnail.new(deps)
 
     if has_thumbnail then
       draw_box(ass, thumb_x1 - frame_pad, thumb_y1 - frame_pad,
-           thumb_x2 + frame_pad, thumb_y2 + frame_pad, 0, "#050708", "20")
+           thumb_x2 + frame_pad, thumb_y2 + frame_pad, dp(6), "#050708",
+           faded("20"))
       local overlay_x = math.floor(thumb_x1 + 0.5)
       local overlay_y = math.floor(thumb_y1 + 0.5)
       enqueue_effect("thumbnail-request", function()
@@ -155,22 +164,22 @@ function thumbnail.new(deps)
     draw_box(ass, time_x1, pill_y1, time_x2, pill_y2, pill_h / 2,
          "#050708", pill_background_alpha)
     draw_text(ass, (time_x1 + time_x2) / 2, (pill_y1 + pill_y2) / 2,
-          time_text, pill_text_size, "#FFFFFF")
+          time_text, pill_text_size, "#FFFFFF", text_alpha)
 
     if chapter_text then
       draw_box(ass, chapter_x1, pill_y1, chapter_x2, pill_y2, pill_h / 2,
            "#050708", pill_background_alpha)
       draw_text(ass, (chapter_x1 + chapter_x2) / 2,
             (pill_y1 + pill_y2) / 2, chapter_text, pill_text_size,
-            "#FFFFFF")
+            "#FFFFFF", text_alpha)
     end
 
     if category_text then
       draw_box(ass, category_x1, pill_y1, category_x2, pill_y2, pill_h / 2,
-        category_color, "00")
+        category_color, faded("00"))
       draw_text(ass, (category_x1 + category_x2) / 2,
         (pill_y1 + pill_y2) / 2, category_text, pill_text_size,
-        category_text_color)
+        category_text_color, text_alpha)
     end
   end
 

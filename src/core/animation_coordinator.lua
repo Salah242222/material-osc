@@ -6,6 +6,7 @@ function animation_coordinator.new(args)
   local animations = {
     runtime.controller.opacity,
     runtime.controller.reveal,
+    runtime.seek.preview_opacity,
     runtime.window_controls.opacity,
     runtime.volume.animation,
     runtime.context_menu.animation,
@@ -180,15 +181,27 @@ function animation_coordinator.new(args)
       runtime.controller.opacity.damping = 32
     end
     runtime.controller.reveal:update(now)
+    runtime.seek.preview_opacity:set_target(
+      runtime.seek.position_pill_visible and 1 or 0, now)
+    runtime.seek.preview_opacity:update(now)
     local follows_controller = args.show_window_controls_with_controller and
       args.show_window_controls_with_controller()
     local window_controls_visible = runtime.window_controls.hovered or
       (follows_controller and runtime.controller.visible)
     runtime.window_controls.visible = window_controls_visible
-    runtime.window_controls.opacity:set_target(
-      window_controls_visible and 1 or 0, now,
+    local buttons = runtime.window_controls.opacity
+    local buttons_target = window_controls_visible and 1 or 0
+    if buttons.target ~= buttons_target and buttons:is_running() then
+      -- turned around mid-slide: catch up at twice the speed, like the controls
+      buttons.stiffness, buttons.damping = 1680, 64
+    end
+    buttons:set_target(buttons_target, now,
       window_controls_visible and 0.12 or 0.18)
-    runtime.window_controls.opacity:update(now)
+    local buttons_moving = buttons:is_running()
+    buttons:update(now)
+    if buttons_moving and not buttons:is_running() then
+      buttons.stiffness, buttons.damping = 420, 32
+    end
     local context_visible = runtime.context_menu.open or
       runtime.context_menu.pending_x ~= nil or
       runtime.context_menu.animation:is_running() or

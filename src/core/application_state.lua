@@ -138,9 +138,12 @@ function application_state.new(args)
     initial = opts.show_on_mouse_move and 1 or 0, duration = 0.35,
     ease = function(t) return 1 - (1 - t) ^ 3 end
   })
-  runtime.window_controls.opacity = animation.tween({
-    initial = 0, duration = 0.16
+  -- the window buttons move on the controls' spring too
+  runtime.window_controls.opacity = animation.spring({
+    initial = 0, stiffness = 420, damping = 32
   })
+  -- the seek preview's pills and frame fade in instead of popping up
+  runtime.seek.preview_opacity = animation.tween({initial = 0, duration = 0.14})
   runtime.context_menu.animation = animation.tween({
     initial = 0, duration = POPUP_FADE_DURATION
   })
