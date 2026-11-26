@@ -108,6 +108,12 @@ function popups.new(services)
       if anchor then
         if args.anchor_start then
           desired_x = anchor.x1 + (args.anchor_offset_x or 0)
+        elseif args.end_at_edge then
+          -- grows out of its button and ends flush with the controls' right
+          -- edge, as on YouTube
+          local right = anchor.x2 + (bounds.x2 - margin - anchor.x2) *
+            clamp(morph_progress(), 0, 1)
+          desired_x = right - popup_size.w
         else
           desired_x = anchor.x2 - popup_size.w + (args.anchor_offset_x or 0)
         end
@@ -1582,7 +1588,7 @@ end
     end
     return PopupHost({
       name = "settings-dialog", state = settings_state,
-      anchor_name = "settings-button",
+      anchor_name = "settings-button", end_at_edge = true,
       opacity_animation = settings_state.fade,
       morph = true,
       on_close = close_from_backdrop,
