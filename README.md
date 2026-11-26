@@ -75,7 +75,7 @@ aspect ratio, and disables automatic window resizing between files; see
 | `precise_strip` | `yes` | `yes`, `no` | Shows a filmstrip of thumbnails below the seekbar while seeking precisely. |
 | `precise_strip_height` | `96` | Pixels, `40`–`240` | Sets the filmstrip height. |
 | `live_edge_offset_seconds` | `2` | Non-negative seconds or `-1` | After a live stream resumes from pausing or buffering, seeks this far behind the live edge. Set to `-1` to disable automatic catch-up. |
-| `temporary_speed` | `2` | Playback rate greater than `0` | Sets the speed used while the `hold-double-speed` binding is held. |
+| `temporary_speed` | `2` | Playback rate greater than `0` | Sets the speed used while the `hold-double-speed` binding, or the right edge of the video, is held. |
 | `show_remaining_time` | `no` | `yes`, `no` | Shows remaining time instead of elapsed time by default. The time display remains clickable to toggle modes. |
 | `adjust_time_with_speed` | `yes` | `yes`, `no` | Adjusts elapsed, remaining, and total displayed time for the current playback speed. |
 | `adjust_subtitle_position` | `yes` | `yes`, `no` | Moves bottom-aligned subtitles above the OSC while it is visible. Set to `no` to preserve mpv's configured `sub-pos`. |

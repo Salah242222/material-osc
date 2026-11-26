@@ -423,6 +423,9 @@ function controller.new(args)
         args.precise_seek:end_scrub()
       end
       runtime.pointer.precise_scrub = nil
+      -- a press that never gets its release (focus lost) still ends a hold
+      local active = runtime.pointer.active
+      if active and active.on_cancel then active.on_cancel(active) end
       runtime.pointer.active = nil
       hold_window_dragging(false)
       runtime.pointer.pending_click = nil

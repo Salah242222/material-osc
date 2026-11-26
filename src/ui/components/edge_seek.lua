@@ -31,6 +31,28 @@ function edge_seek.new(services)
         render()
       end)
     end
+    if side == "right" then
+      -- holding the right side plays at the temporary speed, as on YouTube;
+      -- a quick click still seeks
+      local visual = state.edge_seek.right
+      bounds.on_press = function()
+        visual.holding = false
+        timers:after(visual, "hold_timer", 0.4, function()
+          visual.holding = true
+          services.temporary_speed:activate()
+        end)
+      end
+      bounds.on_cancel = function()
+        timers:cancel(visual, "hold_timer")
+        if visual.holding then services.temporary_speed:deactivate() end
+        visual.holding = false
+      end
+      bounds.on_release = function()
+        local held = visual.holding
+        bounds.on_cancel()
+        if not held and ui.mouse_in(bounds) then bounds.on_click() end
+      end
+    end
     -- keep the zone's slot so controls registered after it stay on top
     if not state.input.hitboxes[name] then
       state.input.order[#state.input.order + 1] = name
@@ -43,6 +65,8 @@ function edge_seek.new(services)
     local opacity = visual.opacity.value
     if opacity <= 0.001 and not visual.opacity:is_running() and
       not visual.slide:is_running() then return end
+    -- a hold plays faster instead, so letting go won't seek
+    if visual.holding then return end
 
     local dp = ui.dp
     local center_fraction = zone_fraction * 0.64
