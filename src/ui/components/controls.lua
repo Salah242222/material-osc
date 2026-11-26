@@ -972,9 +972,7 @@ function controls.new(services)
       state.controller.compact = compact
       self.tiny = compact and state.viewport.w < dp(360)
       state.controller.tiny = self.tiny
-      self.settings_visibility:set_visible(not self.tiny)
       self.screenshot_visibility:set_visible(config.opts.screenshot_button and not compact)
-      self.pip_visibility:set_visible(config.opts.pip_button and not compact)
       self.ontop_visibility:set_visible(config.opts.ontop_button and not compact)
       self.info_visibility:set_visible(config.opts.info_button and not compact)
       self.chapter_name = snapshot.chapter_name
@@ -1057,9 +1055,22 @@ function controls.new(services)
     function node:fit_row(bounds)
       self.chapter:set_visible(false)
       self.time_visibility:set_visible(not self.tiny)
-      if not self.tiny and measure_node(self.starting, bounds).w + dp(16) +
-        measure_node(self.ending_actions, bounds).w > bounds.w then
+      self.pip_visibility:set_visible(config.opts.pip_button)
+      local function overflows()
+        return measure_node(self.starting, bounds).w + dp(16) +
+          measure_node(self.ending_actions, bounds).w > bounds.w
+      end
+      -- the settings button stays while it fits and gives way before the time
+      self.settings_visibility:set_visible(not self.tiny)
+      if not self.tiny and overflows() then
+        self.settings_visibility:set_visible(false)
+      end
+      if not self.tiny and overflows() then
         self.time_visibility:set_visible(false)
+      end
+      -- picture-in-picture goes last, once even it would not fit
+      if config.opts.pip_button and overflows() then
+        self.pip_visibility:set_visible(false)
       end
       if not self.time_visibility.visible then
         -- the clock is redrawn every second at these bounds, so forget them
