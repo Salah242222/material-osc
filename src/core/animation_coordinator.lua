@@ -78,10 +78,11 @@ function animation_coordinator.new(args)
   end
 
   function service:render_mode()
-    -- a horizontal volume slider moves the time display, which is laid out
-    -- with the rest of the controls
+    -- a horizontal volume slider moves the time display: visual frames lay
+    -- the controls out again, and one full frame places their click areas
+    -- once it stops (full frames every time stuttered next to the slide)
     if runtime.volume.animation:is_running() and args.horizontal_volume() then
-      return "full"
+      return "visual"
     end
     -- the controls slid while their hitboxes stayed put; place them again
     if runtime.controller.settled then
@@ -226,8 +227,13 @@ function animation_coordinator.new(args)
           args.mouse_in(runtime.volume.button_bounds)) or
           (runtime.volume.popup_bounds and
             args.mouse_in(runtime.volume.popup_bounds)))))
+    local volume_moving = runtime.volume.animation:is_running()
     runtime.volume.animation:set_target(wants_volume and 1 or 0)
     runtime.volume.animation:update(now)
+    if volume_moving and not runtime.volume.animation:is_running() and
+      args.horizontal_volume() then
+      runtime.controller.settled = true
+    end
 
     runtime.context_menu.animation:set_target(runtime.context_menu.open and 1 or 0)
     runtime.context_menu.animation:update(now)

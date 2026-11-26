@@ -561,9 +561,10 @@ function playlist.new(services, trailing)
       local morphing = playlist_state.animation:is_running() or
         playlist_state.width_animation:is_running() or
         playlist_state.height_animation:is_running()
-      -- the buttons and title slide in from the left as the controller shows
+      -- the buttons slide in from the left as the controller shows (the
+      -- title fades in place)
       local shift = ui.sliding() and (1 - state.controller.opacity.value) *
-        (self.slide_extent or source.x2) or 0
+        (source.x2 + dp(8)) or 0
       local shown = Rect({x = source.x - shift, y = source.y,
         w = source.w, h = source.h})
       if is_render_pass("interaction") then
@@ -586,8 +587,6 @@ function playlist.new(services, trailing)
       local available = math.max(0,
         trailing_bounds.x - title_x - trailing_gap)
       title = truncate_to_width(title, available, 24)
-      -- far enough to take the title past the window's left edge
-      self.slide_extent = title_x + ui.text_width(title, 24) + dp(8)
       ui.without_fade(function()
         if self.morph == 0 and not playlist_state.open and
           not morphing then
@@ -596,10 +595,10 @@ function playlist.new(services, trailing)
             alpha(self.controls_opacity * (1 - 0x58 / 255)))
           draw_control_buttons(ass, shown, shown, 0)
         end
-        ui.draw_shadowed_text(ass, title_x - shift, bounds.y + bounds.h / 2,
-          title, 24, "#FFFFFF", alpha(self.controls_opacity),
-          default_text_font, 4)
       end)
+      ui.draw_shadowed_text(ass, title_x, bounds.y + bounds.h / 2,
+        title, 24, "#FFFFFF", alpha(self.controls_opacity),
+        default_text_font, 4)
       if trailing_size.w > 0 then
         draw_node(self.trailing, ass, trailing_bounds)
       end

@@ -124,8 +124,8 @@ function renderer.new(args)
   end
 
   local function append_clip(ass, bounds)
-    if service.vector_clip then
-      ass:append("{\\clip(" .. service.vector_clip .. ")}")
+    if service.clip_override then
+      ass:append("{\\clip(" .. service.clip_override .. ")}")
       return
     end
     local active = clip_stack[#clip_stack]

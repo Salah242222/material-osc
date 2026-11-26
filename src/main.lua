@@ -1038,10 +1038,11 @@ local services = {
       draw()
       ui_renderer.fade_opacity = nil
     end,
-    -- shows the seekbar (area: its x1, x2 and line y) inside a circle that
-    -- grows from where the pointer was as the controller shows (from the
-    -- playback position without a pointer) and shrinks back as it hides;
-    -- fainter rings around its edge soften it like a blur
+    -- shows the seekbar (area: its x1 and x2) spreading out sideways from
+    -- where the pointer was as the controller shows (from the playback
+    -- position without a pointer) and drawing back in as it hides; fainter
+    -- bands at its ends soften them like a blur. Rectangle clips cost mpv
+    -- next to nothing (circle masks made the controls stutter)
     reveal = function(area, draw)
       -- hiding keeps the slide's pace, so it's gone when the controls are
       local progress = math.min(clamp(runtime.controller.opacity.value, 0, 1),
@@ -1049,54 +1050,44 @@ local services = {
       if progress >= 0.999 or opts.controls_animation == "fade" then
         return draw()
       end
-      local cx, cy = runtime.controller.reveal_x, runtime.controller.reveal_y
+      local cx = runtime.controller.reveal_x
       if not cx then
         local duration = runtime.snapshot.duration or 0
         local ratio = duration > 0 and
           clamp((runtime.snapshot.position or 0) / duration, 0, 1) or 0.5
-        cx, cy = area.x1 + (area.x2 - area.x1) * ratio, area.y
+        cx = area.x1 + (area.x2 - area.x1) * ratio
       end
       -- grow only until the seekbar's far end is covered, so the whole
       -- animation is visible motion
-      local reach = math.max(math.abs(area.x1 - cx), math.abs(area.x2 - cx))
-      reach = math.sqrt(reach ^ 2 + (area.y - cy) ^ 2) + dp(14)
+      local reach = math.max(math.abs(area.x1 - cx), math.abs(area.x2 - cx)) +
+        dp(14)
       local max_feather, bands = dp(56), 5
-      local radius = progress * (reach + max_feather)
-      -- a crisp edge while the circle is small, softening as it grows
-      local feather = math.min(max_feather, radius * 0.4)
-      local function circle(r, reverse)
-        local k = r * 0.5523
-        local points = reverse and {
-          {r, 0}, {r, -k, k, -r, 0, -r}, {-k, -r, -r, -k, -r, 0},
-          {-r, k, -k, r, 0, r}, {k, r, r, k, r, 0}
-        } or {
-          {r, 0}, {r, k, k, r, 0, r}, {-k, r, -r, k, -r, 0},
-          {-r, -k, -k, -r, 0, -r}, {k, -r, r, -k, r, 0}
-        }
-        local path = {}
-        for index, p in ipairs(points) do
-          local coords = {}
-          for i = 1, #p, 2 do
-            coords[#coords + 1] = string.format("%d %d",
-              math.floor(cx + p[i] + 0.5), math.floor(cy + p[i + 1] + 0.5))
-          end
-          path[#path + 1] = (index == 1 and "m " or "b ") .. table.concat(coords, " ")
-        end
-        return table.concat(path, " ")
+      local spread = progress * (reach + max_feather)
+      -- crisp ends while it's short, softening as it grows
+      local feather = math.min(max_feather, spread * 0.4)
+      local function half(r) return math.max(0, r) end
+      local function pass(x1, x2, opacity)
+        x1, x2 = math.floor(x1 + 0.5), math.floor(x2 + 0.5)
+        if x2 <= x1 then return end
+        ui_renderer.clip_override =
+          string.format("%d,0,%d,%d", x1, x2, runtime.viewport.h)
+        ui_renderer.fade_opacity = opacity
+        draw()
       end
       for band = 0, bands do
-        local outer = radius - feather + band * feather / bands
-        local inner = band > 0 and outer - feather / bands or 0
-        if outer > 0 then
-          ui_renderer.vector_clip = circle(outer) ..
-            (inner > 0 and " " .. circle(inner, true) or "")
-          -- a smooth (cosine) falloff across the rings
-          ui_renderer.fade_opacity =
-            0.5 + 0.5 * math.cos(math.pi * band / (bands + 1))
-          draw()
+        local outer = half(spread - feather + band * feather / bands)
+        local inner = band > 0 and
+          half(spread - feather + (band - 1) * feather / bands) or 0
+        -- a smooth (cosine) falloff across the bands
+        local opacity = 0.5 + 0.5 * math.cos(math.pi * band / (bands + 1))
+        if inner > 0 then
+          pass(cx - outer, cx - inner, opacity)
+          pass(cx + inner, cx + outer, opacity)
+        else
+          pass(cx - outer, cx + outer, opacity)
         end
       end
-      ui_renderer.vector_clip, ui_renderer.fade_opacity = nil, nil
+      ui_renderer.clip_override, ui_renderer.fade_opacity = nil, nil
     end,
     push_clip = function(bounds) ui_renderer:push_clip(bounds) end,
     pop_clip = function() ui_renderer:pop_clip() end,
