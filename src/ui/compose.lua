@@ -38,6 +38,8 @@ function compose.new(deps)
     return (pass or default_render_pass) == render_pass
   end
 
+  local function is_registering() return register_interactions end
+
   local function Rect(args)
     return {
       x = args.x,
@@ -669,6 +671,7 @@ function compose.new(deps)
     Rect = Rect,
     set_render_pass = set_render_pass,
     is_render_pass = is_render_pass,
+    is_registering = is_registering,
     RectangleShape = RectangleShape,
     RoundedCornerShape = RoundedCornerShape,
     Modifier = Modifier,

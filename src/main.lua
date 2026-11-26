@@ -382,7 +382,18 @@ local function create_app(services)
       state.volume.popup_bounds, state.volume.button_bounds = nil, nil
       state.edge_seek.left.bounds, state.edge_seek.right.bounds = nil, nil
     elseif state.controller.opacity.value > 0 then
-      state.controller.bounds = ui.draw_node(self.controller, ass, root)
+      if ui.is_registering() and state.controller.opacity:is_running() then
+        -- place the click areas where the controls come to rest, so they
+        -- work while still sliding in; the visible draw then leaves them be
+        state.controller.at_rest = true
+        ui.draw_node(self.controller, assdraw.ass_new(), root)
+        state.controller.at_rest = false
+        ui.set_render_pass("base", "base", false)
+        state.controller.bounds = ui.draw_node(self.controller, ass, root)
+        ui.set_render_pass("base", "base", true)
+      else
+        state.controller.bounds = ui.draw_node(self.controller, ass, root)
+      end
     else
       local size = ui.measure_node(self.controller, root)
       state.controller.bounds = ui.Rect({
@@ -1031,7 +1042,9 @@ local services = {
     draw_text = draw_text, draw_seekbar = draw_seekbar,
     draw_shadowed_text = draw_shadowed_text,
     -- the controls slide in and out unless controls_animation is "fade"
-    sliding = function() return opts.controls_animation ~= "fade" end,
+    sliding = function()
+      return opts.controls_animation ~= "fade" and not runtime.controller.at_rest
+    end,
     without_fade = function(draw)
       if opts.controls_animation == "fade" then return draw() end
       ui_renderer.fade_opacity = 1
@@ -1040,9 +1053,9 @@ local services = {
     end,
     -- shows the seekbar (area: its x1 and x2) spreading out sideways from
     -- where the pointer was as the controller shows (from the playback
-    -- position without a pointer) and drawing back in as it hides; fainter
-    -- bands at its ends soften them like a blur. Rectangle clips cost mpv
-    -- next to nothing (circle masks made the controls stutter)
+    -- position without a pointer) and drawing back in as it hides. A
+    -- rectangle clip costs mpv next to nothing (circle masks made the
+    -- controls stutter, and soft edges meant drawing the bar several times)
     reveal = function(area, draw)
       -- hiding keeps the slide's pace, so it's gone when the controls are
       local progress = math.min(clamp(runtime.controller.opacity.value, 0, 1),
@@ -1059,34 +1072,15 @@ local services = {
       end
       -- grow only until the seekbar's far end is covered, so the whole
       -- animation is visible motion
-      local reach = math.max(math.abs(area.x1 - cx), math.abs(area.x2 - cx)) +
-        dp(14)
-      local max_feather, bands = dp(56), 5
-      local spread = progress * (reach + max_feather)
-      -- crisp ends while it's short, softening as it grows
-      local feather = math.min(max_feather, spread * 0.4)
-      local function half(r) return math.max(0, r) end
-      local function pass(x1, x2, opacity)
-        x1, x2 = math.floor(x1 + 0.5), math.floor(x2 + 0.5)
-        if x2 <= x1 then return end
-        ui_renderer.clip_override =
-          string.format("%d,0,%d,%d", x1, x2, runtime.viewport.h)
-        ui_renderer.fade_opacity = opacity
-        draw()
-      end
-      for band = 0, bands do
-        local outer = half(spread - feather + band * feather / bands)
-        local inner = band > 0 and
-          half(spread - feather + (band - 1) * feather / bands) or 0
-        -- a smooth (cosine) falloff across the bands
-        local opacity = 0.5 + 0.5 * math.cos(math.pi * band / (bands + 1))
-        if inner > 0 then
-          pass(cx - outer, cx - inner, opacity)
-          pass(cx + inner, cx + outer, opacity)
-        else
-          pass(cx - outer, cx + outer, opacity)
-        end
-      end
+      local spread = progress *
+        (math.max(math.abs(area.x1 - cx), math.abs(area.x2 - cx)) + dp(14))
+      local x1 = math.floor(cx - spread + 0.5)
+      local x2 = math.floor(cx + spread + 0.5)
+      if x2 <= x1 then return end
+      ui_renderer.clip_override =
+        string.format("%d,0,%d,%d", x1, x2, runtime.viewport.h)
+      ui_renderer.fade_opacity = 1
+      draw()
       ui_renderer.clip_override, ui_renderer.fade_opacity = nil, nil
     end,
     push_clip = function(bounds) ui_renderer:push_clip(bounds) end,
@@ -1103,7 +1097,8 @@ local services = {
     ConnectedPill = ConnectedPill,
     request_tooltip = request_tooltip,
     set_render_pass = set_render_pass,
-    is_render_pass = is_render_pass
+    is_render_pass = is_render_pass,
+    is_registering = compose.is_registering
   },
   player = {
     snapshot = function() return runtime.snapshot end,
@@ -1306,7 +1301,7 @@ local function present_layer(name, ass)
   end
 end
 
-local function draw_overlay_layer(name, default_pass, register_interactions)
+local function draw_overlay_layer(name, default_pass, register_interactions, into)
   local layer = overlay_layers[name]
   local overlay = layer.overlay
   overlay.res_x, overlay.res_y = runtime.viewport.w, runtime.viewport.h
@@ -1321,10 +1316,10 @@ local function draw_overlay_layer(name, default_pass, register_interactions)
     runtime.input.keyboard_generation =
       runtime.input.keyboard_generation + 1
   end
-  local ass = assdraw.ass_new()
+  local ass = into or assdraw.ass_new()
   app:draw_layer(name, ass,
     Rect({x = 0, y = 0, w = runtime.viewport.w, h = runtime.viewport.h}))
-  present_layer(name, ass)
+  return ass
 end
 
 local renderer = frame_runtime.renderer.new({
@@ -1340,14 +1335,34 @@ local renderer = frame_runtime.renderer.new({
   draw_layers = function(mode)
     ui_renderer:begin_frame()
     local full = mode == "full"
+    -- the base layer still holds a merged frame (below): redraw every layer
+    if overlay_layers.base.merged and not full then mode = "visual" end
+    -- while the controls slide, the base, dynamic and hover layers go out as
+    -- one overlay update: separate updates let mpv show a frame with one
+    -- layer moved and another not, so parts drifted from their pills
+    local merged = (full or mode == "visual") and
+      runtime.controller.opacity:is_running() and assdraw.ass_new() or nil
+    local drawn = {}
     if full or mode == "visual" then
-      draw_overlay_layer("base", "base", full)
+      drawn.base = draw_overlay_layer("base", "base", full, merged)
     end
-    draw_overlay_layer("dynamic", "base", true)
+    drawn.dynamic = draw_overlay_layer("dynamic", "base", true, merged)
     if mode ~= "dynamic" then
-      draw_overlay_layer("interaction", "base", false)
-      draw_overlay_layer("modal", "modal", true)
+      drawn.interaction = draw_overlay_layer("interaction", "base", false, merged)
+      present_layer("modal", draw_overlay_layer("modal", "modal", true))
     end
+    if merged then
+      present_layer("base", merged)
+      present_layer("dynamic", assdraw.ass_new())
+      present_layer("interaction", assdraw.ass_new())
+    else
+      -- top layers first, so nothing leaving a merged base layer for its own
+      -- layer is missing for a frame (the gear flickered)
+      for _, name in ipairs({"interaction", "dynamic", "base"}) do
+        if drawn[name] then present_layer(name, drawn[name]) end
+      end
+    end
+    overlay_layers.base.merged = merged ~= nil
     local controller_bounds = runtime.controller.bounds
     -- the subtitles keep pace with the controls, sped up or not
     subtitle_position.offset_animation.stiffness = runtime.controller.opacity.stiffness
@@ -1382,6 +1397,12 @@ local renderer = frame_runtime.renderer.new({
 })
 render = function(refresh_snapshot, layer)
   if refresh_snapshot ~= false then snapshot_reader:invalidate() end
+  -- while the controls slide, every redraw covers all layers, which then go
+  -- out together (see draw_layers)
+  if (layer == "interaction" or layer == "dynamic") and
+    runtime.controller.opacity:is_running() then
+    layer = "visual"
+  end
   renderer:request_render(layer)
   runtime_host:update_frame_timer()
 end
