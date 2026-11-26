@@ -154,12 +154,18 @@ end
 function keybinding_hints.new(args)
   local service = {}
   local cached_bindings, cached_at
+  -- each action's shortcut, until the bindings change: tooltips ask for it
+  -- on every frame they're shown, and scanning all bindings each time made
+  -- the controls stutter while animating
+  local found = {}
 
   local function current_bindings()
     local now = args.now and args.now() or nil
     if not cached_bindings or not now or not cached_at or
       now - cached_at >= 0.5 then
-      cached_bindings = args.bindings() or {}
+      local bindings = args.bindings() or {}
+      if bindings ~= cached_bindings then found = {} end
+      cached_bindings = bindings
       cached_at = now
     end
     return cached_bindings
@@ -168,8 +174,10 @@ function keybinding_hints.new(args)
   function service:for_action(action)
     local matcher = MATCHERS[action]
     if not matcher then return nil end
+    local bindings = current_bindings()
+    if found[action] ~= nil then return found[action] or nil end
     local best, best_score
-    for index, binding in ipairs(current_bindings()) do
+    for index, binding in ipairs(bindings) do
       local key = type(binding) == "table" and binding.key or nil
       local command = type(binding) == "table" and
         normalize_command(binding.cmd) or ""
@@ -185,8 +193,8 @@ function keybinding_hints.new(args)
       end
     end
     if not best then best = SCRIPT_DEFAULT_KEYS[action] end
-    if not best then return nil end
-    return {key = best, labels = labels_for_key(best)}
+    found[action] = best and {key = best, labels = labels_for_key(best)} or false
+    return found[action] or nil
   end
 
   return service
