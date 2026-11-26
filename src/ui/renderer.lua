@@ -279,9 +279,10 @@ function renderer.new(args)
   end
 
   function service:draw_icon(ass, x, y, icon, color, size, alpha,
-      ignore_controller_fade, clip_bounds)
+      ignore_controller_fade, clip_bounds, style)
     self:draw_text(ass, x, y, icon, size or self.icon_text_size, color, alpha,
-      "Material Symbols Rounded", nil, nil, ignore_controller_fade, clip_bounds)
+      "Material Symbols Rounded", nil, nil, ignore_controller_fade, clip_bounds,
+      style)
   end
 
   return service

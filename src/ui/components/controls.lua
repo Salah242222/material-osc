@@ -905,8 +905,10 @@ function controls.new(services)
       visible = config.opts.screenshot_button,
       child = node.screenshot
     })
+    -- drawn with the hover layer, which redraws while the panel animates, so
+    -- the gear can turn as Settings opens and back as it closes, as on YouTube
     node.settings = IconButton({name = "settings-button", icon = "settings",
-      horizontal_padding = 6, tooltip = "Settings",
+      horizontal_padding = 6, tooltip = "Settings", render_pass = "interaction",
       shortcut = "open-settings",
       on_click = function()
         set_settings_dialog_open(not settings_state.open)
@@ -961,6 +963,7 @@ function controls.new(services)
 
     function node:update(snapshot, static_changed)
       self.sponsorblock:update()
+      self.settings.rotation = 30 * settings_state.animation.value
       self.screenshot_visibility:set_visible(config.opts.screenshot_button)
       self.pip_visibility:set_visible(config.opts.pip_button)
       self.ontop_visibility:set_visible(config.opts.ontop_button)

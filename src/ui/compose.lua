@@ -401,8 +401,10 @@ function compose.new(deps)
           draw_icon(ass, center_x, center_y, self.transition_icon, icon_color,
             self.icon_size, faded_alpha(progress), self.ignore_controller_fade)
         else
+          -- rotation is clockwise degrees (ASS turns counter-clockwise)
           draw_icon(ass, center_x, center_y, self.icon, icon_color, self.icon_size,
-            icon_alpha, self.ignore_controller_fade)
+            icon_alpha, self.ignore_controller_fade, nil,
+            self.rotation and {rotation = -self.rotation} or nil)
         end
       end
       if self.tooltip and self.enabled and mouse_in(bounds) then
