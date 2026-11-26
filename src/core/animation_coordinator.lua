@@ -89,6 +89,12 @@ function animation_coordinator.new(args)
       runtime.controller.opacity:is_running() then
       return "visual"
     end
+    -- the settings gear turns with its panel and is drawn with its pill, so
+    -- that layer redraws too (a gear on the hover layer flickered as the
+    -- controls slid)
+    if runtime.settings.animation:is_running() then
+      return "visual"
+    end
     if runtime.window_controls.opacity:is_running() then
       return "interaction"
     end
