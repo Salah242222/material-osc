@@ -260,7 +260,8 @@ function mpv_runtime.new(args)
       {"contrast", "number"}, {"saturation", "number"},
       {"glsl-shaders", "native"},
       {"sub-delay", "number"}, {"sub-font-size", "number"},
-      {"sub-outline-size", "number"}, {"sub-color", "string"},
+      {"sub-outline-size", "number"}, {"sub-blur", "number"},
+      {"sub-color", "string"},
       {"sub-font", "string"}, {"volume-max", "number"}
     }) do
       local name = property[1]

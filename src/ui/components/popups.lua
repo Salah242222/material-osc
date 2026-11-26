@@ -694,9 +694,10 @@ end
 
   local function SubtitleStylePopup(on_back)
     local node = {
-      width = dp(360), height = dp(376), interactive = false,
+      width = dp(360), height = dp(420), interactive = false,
       panel_alpha = "00", text_alpha = "00", secondary_alpha = "00",
       hover_alpha = "00", delay_value = 0, font_size = 38, border_size = 1.65,
+      blur = 0,
       position = 100,
       color = "#FFFFFFFF", font = "sans-serif",
       modifier = Modifier():clickable({
@@ -708,6 +709,7 @@ end
       mp.set_property_number("sub-delay", defaults.delay)
       mp.set_property_number("sub-font-size", defaults.font_size)
       mp.set_property_number("sub-outline-size", defaults.border)
+      mp.set_property_number("sub-blur", defaults.blur)
       mp.set_property("sub-color", defaults.color)
       mp.set_property("sub-font", defaults.font)
       services.subtitle_position:set_baseline(services.subtitle_position.configured)
@@ -756,6 +758,10 @@ end
       function()
         mp.set_property_number("sub-outline-size", clamp(node.border_size + 0.5, 0, 10))
       end)
+    -- softens the border's edge (or the letters' when there's no border)
+    node.blur_row = SubtitleAdjustRow("subtitle-blur", "Blur",
+      function() mp.set_property_number("sub-blur", clamp(node.blur - 0.5, 0, 20)) end,
+      function() mp.set_property_number("sub-blur", clamp(node.blur + 0.5, 0, 20)) end)
     node.color_row = SubtitleAdjustRow("subtitle-color", "Color",
       function()
         local item = cycle_option(subtitle_colors, normalize_subtitle_color(node.color), -1,
@@ -789,6 +795,7 @@ end
       common.value = string.format("%g", 100 - mp.get_property_number("secondary-sub-pos", 0))
       self.secondary_height_row:update(common)
       common.value = string.format("%g", self.border_size); self.border:update(common)
+      common.value = string.format("%g", self.blur); self.blur_row:update(common)
       local color_name = normalize_subtitle_color(self.color)
       for _, item in ipairs(subtitle_colors) do
         if item.value == color_name then color_name = item.name break end
@@ -804,7 +811,8 @@ end
         dp(30), "#050708", self.panel_alpha)
       draw_node(self.header, ass, Rect({x = bounds.x, y = bounds.y, w = bounds.w, h = dp(56)}))
       local rows = {self.delay, self.font_size_row, self.height_row,
-        self.secondary_height_row, self.border, self.color_row, self.font_row}
+        self.secondary_height_row, self.border, self.blur_row, self.color_row,
+        self.font_row}
       local y = bounds.y + dp(60)
       for _, row in ipairs(rows) do
         draw_node(row, ass, Rect({x = bounds.x + dp(8), y = y,
@@ -1424,6 +1432,7 @@ end
         page_props.delay_value = self.subtitle_delay
         page_props.font_size = self.subtitle_font_size
         page_props.border_size = self.subtitle_border_size
+        page_props.blur = self.subtitle_blur
         page_props.color = self.subtitle_color
         page_props.font = self.subtitle_font
         self.subtitle_style:update(page_props)
@@ -1617,7 +1626,7 @@ end
         if settings_state.page == "root" then
           desired_h = dp(308)
         elseif settings_state.page == "speed" then desired_h = dp(190)
-        elseif settings_state.page == "subtitle_style" then desired_h = dp(376)
+        elseif settings_state.page == "subtitle_style" then desired_h = dp(420)
         elseif settings_state.page == "video_settings" then desired_h = dp(332)
         elseif settings_state.page == "video_crop" or
           settings_state.page == "video_aspect" then desired_h = dp(164)
@@ -1687,6 +1696,7 @@ end
         props.subtitle_delay = snapshot.subtitle_delay or 0
         props.subtitle_font_size = snapshot.subtitle_font_size or 38
         props.subtitle_border_size = snapshot.subtitle_border_size or 1.65
+        props.subtitle_blur = snapshot.subtitle_blur or 0
         props.subtitle_color = snapshot.subtitle_color or "#FFFFFFFF"
         props.subtitle_font = snapshot.subtitle_font or "sans-serif"
         props.video_crop_value = snapshot.video_crop or ""
